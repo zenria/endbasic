@@ -921,7 +921,7 @@ impl Console for SdlConsole {
 
     async fn read_key(&mut self) -> io::Result<Key> {
         loop {
-            let event = self.event_pump.wait_event();
+            let event = tokio::task::block_in_place(|| self.event_pump.wait_event());
             if let Some(event) = parse_event(event)? {
                 return Ok(event);
             }
