@@ -629,36 +629,56 @@ impl SdlConsole {
             self.cursor_pos.y += 1;
             return Ok(());
         }
-
-        let mut shifted = {
-            let src = self.canvas.surface();
-            let mut temp = Surface::new(src.width(), src.height(), self.pixel_format)
-                .map_err(string_error_to_io_error)?;
-            src.blit(
+        // load pixels from the current canvas & create a texture with it
+        let pixels = self
+            .canvas
+            .read_pixels(
+                Rect::new(0, 0, self.size_pixels.width.into(), self.size_pixels.height.into()),
+                self.pixel_format,
+            )
+            .map_err(string_error_to_io_error)?;
+        let mut texture = self
+            .texture_creator
+            .create_texture_static(
+                None,
+                self.size_pixels.width.into(),
+                self.size_pixels.height.into(),
+            )
+            .map_err(texture_value_error_to_io_error)?;
+        texture
+            .update(
+                None,
+                &pixels,
+                (self.size_pixels.width as usize) * self.pixel_format.byte_size_per_pixel(),
+            )
+            .map_err(update_texture_error_to_io_error)?;
+        self.canvas
+            .copy(
+                &texture,
                 Rect::new(
                     0,
                     i32::from(self.font.glyph_size.height),
                     u32::from(self.size_pixels.width),
                     u32::from(self.size_pixels.height - self.font.glyph_size.height),
                 ),
-                &mut temp,
-                None,
-            )
-            .map_err(string_error_to_io_error)?;
-            temp
-        };
-        shifted
-            .fill_rect(
                 Rect::new(
                     0,
-                    i32::from(self.size_pixels.height - self.font.glyph_size.height),
+                    0,
                     u32::from(self.size_pixels.width),
-                    u32::from(self.font.glyph_size.height),
+                    u32::from(self.size_pixels.height - self.font.glyph_size.height),
                 ),
-                self.bg_color,
             )
             .map_err(string_error_to_io_error)?;
-        shifted.blit(None, self.canvas.surface_mut(), None).map_err(string_error_to_io_error)?;
+
+        self.canvas.set_draw_color(self.bg_color);
+        self.canvas
+            .fill_rect(Rect::new(
+                0,
+                i32::from(self.size_pixels.height - self.font.glyph_size.height),
+                u32::from(self.size_pixels.width),
+                u32::from(self.font.glyph_size.height),
+            ))
+            .map_err(string_error_to_io_error)?;
 
         self.cursor_pos.x = 0;
         Ok(())
