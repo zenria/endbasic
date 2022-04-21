@@ -22,7 +22,7 @@ use sdl2::event::Event;
 use sdl2::keyboard::{Keycode, Mod};
 use sdl2::pixels::{Color, PixelFormatEnum};
 use sdl2::rect::{Point, Rect};
-use sdl2::render::{SurfaceCanvas, TextureCreator, TextureValueError, UpdateTextureError};
+use sdl2::render::{Canvas, SurfaceCanvas, TextureCreator, TextureValueError, UpdateTextureError};
 use sdl2::surface::{Surface, SurfaceContext};
 use sdl2::ttf::{Font, FontError, InitError, Sdl2TtfContext};
 use sdl2::video::{Window, WindowBuildError};
@@ -416,7 +416,7 @@ pub(crate) struct SdlConsole {
     event_pump: EventPump,
 
     /// Window that hosts the console.
-    window: Window,
+    window: Canvas<Window>,
 
     /// Off-screen canvas in which to draw the console.  Use `present_canvas` to copy the contents
     /// of this surface onto the window.
@@ -524,7 +524,7 @@ impl SdlConsole {
             _context: context,
             font,
             event_pump,
-            window,
+            window: window.into_canvas().present_vsync().build().unwrap(),
             canvas,
             pixel_format,
             texture_creator,
@@ -547,13 +547,12 @@ impl SdlConsole {
     /// Renders the current contents of `self.canvas` onto the output window irrespective of the
     /// status of the sync flag.
     fn force_present_canvas(&mut self) -> io::Result<()> {
-        let mut window_surface =
-            self.window.surface(&self.event_pump).map_err(string_error_to_io_error)?;
-        self.canvas
-            .surface()
-            .blit(None, &mut window_surface, None)
-            .map_err(string_error_to_io_error)?;
-        window_surface.finish().map_err(string_error_to_io_error)
+        let creator = self.window.texture_creator();
+        let texture = creator.create_texture_from_surface(self.canvas.surface()).unwrap();
+        self.window.clear();
+        self.window.copy(&texture, None, None).unwrap();
+        self.window.present();
+        Ok(())
     }
 
     /// Renders the current contents of `self.canvas` onto the output window.
